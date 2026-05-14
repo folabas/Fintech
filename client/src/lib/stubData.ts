@@ -112,21 +112,31 @@ function seedTransactionsForBalance(target: number): Transaction[] {
 
 function generateNewTransactions(count: number): Transaction[] {
   const txns: Transaction[] = [];
+  // Generate 1 debit + N credits so net is always positive
   for (let i = 0; i < count; i++) {
-    const isCredit = Math.random() > 0.5;
-    const amount = Math.round((Math.random() * 12000 + 50) * 100) / 100;
+    const amount = Math.round((Math.random() * 15000 + 500) * 100) / 100;
     txns.push({
       refNo: randomRef(),
       amount,
       receivingAccount: randomAccountId(),
       bank: pick(banks),
-      type: isCredit ? 'credit' : 'debit',
-      description: isCredit
-        ? pick(descriptions.filter(d => d !== 'ATM Withdrawal'))
-        : pick(descriptions),
+      type: 'credit',
+      description: pick(descriptions.filter(d => d !== 'ATM Withdrawal')),
     });
   }
-  return txns;
+  // Add one small debit to keep it realistic
+  for (let i = 0; i < Math.min(count, 2); i++) {
+    const amount = Math.round((Math.random() * 2000 + 50) * 100) / 100;
+    txns.push({
+      refNo: randomRef(),
+      amount,
+      receivingAccount: randomAccountId(),
+      bank: pick(banks),
+      type: 'debit',
+      description: pick(descriptions),
+    });
+  }
+  return shuffle(txns);
 }
 
 function storageKey(userId: string): string {
@@ -205,8 +215,10 @@ export function addAndSaveTransactions(
     newLedger = serverBalance + Math.round((serverBalance * 0.005) * 100) / 100;
   } else {
     newBalance = Math.round((current.accountBalance + net) * 100) / 100;
+    if (newBalance < 0) newBalance = 0;
     const ledgerDiff = Math.round((net * 0.05) * 100) / 100;
     newLedger = Math.round((current.ledgerBalance + net + ledgerDiff) * 100) / 100;
+    if (newLedger < 0) newLedger = 0;
   }
 
   const updated: StubData = {
