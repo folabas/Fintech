@@ -150,7 +150,11 @@ export function loadOrInitData(
 ): StubData {
   const key = storageKey(userId);
   const saved = localStorage.getItem(key);
-  if (saved && !isStatic) {
+  const savedBalance = saved ? (JSON.parse(saved) as StubData).accountBalance : null;
+  const balanceChanged = savedBalance !== null && Math.abs(savedBalance - serverBalance) > 1;
+
+  // If balance changed significantly (e.g. range update), reset data
+  if (saved && !balanceChanged && !isStatic) {
     try {
       return JSON.parse(saved) as StubData;
     } catch {
@@ -160,10 +164,10 @@ export function loadOrInitData(
 
   const ledger = serverBalance + Math.round((serverBalance * 0.005) * 100) / 100;
   const oldTxns = saved ? (JSON.parse(saved) as StubData).transactions : [];
-  const keepTxns = isStatic && saved
+  const keepTxns = (!isStatic && balanceChanged) ? [] : (isStatic && saved
     ? (Math.abs((JSON.parse(saved) as StubData).accountBalance - serverBalance) > 1
       ? [] : oldTxns)
-    : oldTxns;
+    : oldTxns);
   const data: StubData = {
     accountBalance: serverBalance,
     ledgerBalance: ledger,
